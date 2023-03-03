@@ -1,0 +1,105 @@
+---
+title: "Assignment 3, Task 1"
+author: "Alessandra Puig-Santana"
+date: "2023-03-01"
+output:
+  html_document: 
+    code_folding: show
+    toc: yes
+    theme: paper
+---
+
+# Introduction
+In this task, I am exploring a data set through principal components analysis (PCA) and visualizing it through a biplot and a screeplot. I am using data compiled and provided by @zander_venter on Kaggle, described as: “This data is all acquired through Google Earth Engine (https://earthengine.google.com/) where publicly available remote sensing datasets have been uploaded… Most of the data is derived by calculating the mean for each country at a reduction scale of about 10km” . It includes information on seasonality, temperature, rainfall, accessibility to cities, tree cover and more for each country. A subset was created to look at the relationships between accessibility to cities, tree canopy cover, mean annual rain, mean annual temperature, temperature seasonality, wind, and cloudiness for each county.
+         
+To visualize the relationship between variables, a biplot is generated in order to determine how the variance is explained as well as how each variable contributes to the variance plotted. The biplot converts a multidimensional dataset into a 2-dimensional visualization. Additionally, a screeplot is generated to understand to see the variance explained by each principal component.
+
+
+```{r setup, echo = TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# Set up chunk
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(janitor)
+```
+
+```{r}
+# Read in data
+world_env_vars_clean <- read_csv(here("data", "world_env_vars.csv")) %>%
+  clean_names() %>%
+  drop_na() # drop all NA values
+```
+## Data wrangling
+```{r}
+# Data wrangling 
+
+world_clean <- world_env_vars_clean %>%
+      select(country, accessibility_to_cities, tree_canopy_cover, rain_mean_annual, temp_mean_annual, temp_seasonality, wind, cloudiness) %>% 
+    rename("Accessibility to cities"= "accessibility_to_cities",
+         "Tree canopy cover" = "tree_canopy_cover",
+         "Mean annual rain" = "rain_mean_annual",
+         "Mean annual temp" = "temp_mean_annual",
+         "Temp seasonality" = "temp_seasonality",
+         "Wind" = "wind",
+         "Cloudiness" = "cloudiness") %>% 
+  select(where(is.numeric))
+
+world_pca <- world_clean %>% 
+  scale() %>% 
+  prcomp()
+
+# loadings check
+## world_pca$rotation
+```
+
+# Biplot
+```{r}
+#biplot
+
+autoplot(world_pca,
+        data = world_clean,
+        loadings.label = TRUE,
+        loadings.colour = "darkred",
+        loadings.label.colour = "black",
+        colour = 'cadetblue3',
+        loadings.label.vjust = 0.9,
+        loadings.label.size = 3,
+        loadings.label.repel = T) +
+  theme_minimal()
+```
+
+
+**Figure 1: Biplot.** The red vectors represent the variables and the length of these vectors show to what extend the variance of PC1 and PC2 is explained by the variable. The light blue points are the projection of the data onto the two dimensional space.
+
+
+
+# Screeplot
+```{r}
+sd_vec <- world_pca$sdev
+
+var_vec <- sd_vec^2 ### standard deviation is sqrt of variance!
+
+pc_names <- colnames(world_pca$rotation)
+
+pct_expl_df <- data.frame(v = var_vec,
+                          pct_v = var_vec / sum(var_vec),
+                          pc = fct_inorder(pc_names)) %>%
+  mutate(pct_lbl = paste0(round(pct_v*100, 1), '%'))
+
+ggplot(pct_expl_df, aes(x = pc, y = v)) +
+  geom_col(color = "darkslategray", fill = "darkseagreen1") +
+  geom_text(aes(label = pct_lbl), vjust = 0, nudge_y = .02) +
+  labs(x = 'Principal component (PC)', y = 'Variance explained')+
+  theme_minimal()
+  
+```
+
+
+**Figure 2: Screeplot.** Demonstrates the variance explained by each principal component. 
+
+# Summary
+**Figure 1** demonstrates how accessibility to cities, tree canopy cover, mean annual rain, mean annual temperature, temperature seasonality, wind, and cloudiness for each county relate to one another in terms of PC1 and PC2. We can see that cloudiness, tree canopy cover, and mean annual rain are all pointing in the same direction, meaning that they all have a positive relationship on each other. It is pretty intuitive because the more clouds means that there will be more rain and results in more tree growth. Inverse to this grouping is temperature seasonality, as seen from the 180 degree angle approximation. This can mean that there is less temperature seasonality as there is a shift in mean annual rain and the three other. Accessibility to cities and mean annual temp have an angle of approximately 90 degrees which indicates that they are independent from one another.
+
+**Figure 2**, a 2-D visualization of the data using PC1 and PC2 accounts for 68% of the variance in the data. For further accountability of the variance, a 3-D biplot could be produced if PC3 would be included, which would add up to 86.5% of the variance in the data set being explained. Further additions would be unnecessary and would be impossible to visualize and would not contribute much to the PCA with the amount of added variance that would be included.
