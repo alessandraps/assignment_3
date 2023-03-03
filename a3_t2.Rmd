@@ -1,0 +1,122 @@
+---
+title: "Assignment 3, Task 2"
+author: "Alessandra Puig-Santana"
+date: "2023-03-02"
+output:
+  html_document: 
+    code_folding: show
+    toc: yes
+    theme: paper
+---
+# Introduction
+In this task we use hierarchical clustering by complete linkage, single linkage, and and a tanglegram demonstrating multivariate clustering for water chemistry by site in the Santa Barbara Coastal Drainage Area collected by the Santa Barbara (SB) Coastal Long Term Ecological Research (LTER) Network. I did this by grouping each sampling site by their similarities with agglomerative hierarchical clustering.
+
+The SB Coastal LTER collected information on the sampling site, the sampling date, and concentrations of different chemicals such as nitrates, ammonium, phosphates, and more. We visualize these groupings through dendrograms by the clustering algorithm and tanglegrams are created to show the differences between different dendrograms created.
+
+
+```{r setup, echo = TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# set up chunk 
+
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggdendro)
+library(NbClust)
+library(cluster)
+library(factoextra)
+library(dendextend)
+
+```
+
+```{r}
+# read in data
+stream_chem <- read_csv(here("data", "sbc_lter_registered_stream_chemistry.csv"))
+```
+
+```{r}
+# Data Wrangling
+
+stream_chem_clean <- stream_chem %>%
+  clean_names() %>%
+  na_if(-999) %>%
+  drop_na() %>% 
+  select(-timestamp_local) %>%
+  group_by(site_code) %>% 
+  summarize(nh4_u_m = mean(nh4_u_m),
+            no3_u_m = mean(no3_u_m),
+            po4_u_m = mean(po4_u_m),
+            tdn_u_m = mean(tdn_u_m),
+            tdp_u_m = mean(tdp_u_m),
+            tpc_u_m = mean(tpc_u_m),
+            tpn_u_m = mean(tpn_u_m),
+            tpp_u_m = mean(tpp_u_m),
+            tss_mgper_liter = mean(tss_mgper_liter),
+            spec_cond_u_spercm = mean(spec_cond_u_spercm))
+
+### scales the data to have a mean of 0
+stream_chem_scale <- stream_chem_clean %>% 
+  select(!1:2) %>% 
+  scale()
+
+## rownames become the site location 
+rownames(stream_chem_scale) <- stream_chem_clean$site_code 
+```
+
+# Hierarchical clustering
+## Complete linkage method
+```{r}
+## calculates the distance matrix
+chem_dist <- dist(stream_chem_scale, method = 'euclidean')
+
+### cluster analysis
+chem_dist_hc <- hclust(chem_dist, method = 'complete')
+chem_dist_min <- hclust(chem_dist, method = 'single')
+chem_dist_w <- hclust(chem_dist, method = 'ward.D')
+
+### dendogram creation
+ggdendrogram(chem_dist_hc) +
+  labs(x = 'Sampling site',
+       y = 'Distance') +
+  theme_minimal()
+```
+
+
+**Figure 1. Dendrogram** Complete linkage method
+
+## Single linkage method 
+```{r}
+ggdendrogram(chem_dist_min) +
+  labs(x = 'Sampling site',
+       y = 'Distance') +
+  theme_minimal()
+```
+
+
+**Figure 2. Dendrogram** Single linkage method
+
+## Tanglegram
+```{r}
+### converts clustering to dendrogram class
+dend_complete <- as.dendrogram(chem_dist_hc)
+dend_single <- as.dendrogram(chem_dist_min)
+dend_w <- as.dendrogram(chem_dist_w)
+
+### tanglegram creation
+dendextend::tanglegram(dend_complete, dend_single)
+```
+
+**Figure 3. Tanglegram** Demonstrates the differences in grouping between **Figure 1** and **Figure 2** using complete (left) and single (right) methods.
+
+# Summary 
+* Site ON02 has its own branch in both dendrograms. This demonstrates that this site has the most differences when compared to other sites. In terms of this data, this stream has a different chemical composition. 
+
+* Sites MC00 and AB00 are the tightest grouping. This demonstrates that these two sites have the most similarities when compared to other groupings. In terms of this data, these two sites have the closest chemical properties. 
+
+* There are numerous grouping algorithms available in clustering analysis, so if other methods were to be used, different groupings would be observed.
+
+* As seen in **Figure 3**, the grouping order of the sampling sites has no difference. The different methods result in a difference between each site. 
+
+
+**Citation:** Santa Barbara Coastal LTER and J. Melack. 2019. SBC LTER: Land: Stream chemistry in the Santa Barbara Coastal drainage area, ongoing since 2000 ver 16. Environmental Data Initiative. https://doi.org/10.6073/pasta/67a558a24ceed9a0a5bf5e46ab841174.
